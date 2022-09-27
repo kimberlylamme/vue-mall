@@ -1,41 +1,76 @@
 import { useCartStore } from '@/stores/cartStore'
 import { storeToRefs } from 'pinia'
 import { defineComponent } from 'vue'
-import goodImage from '../../assets/goods.jpg'
 
 const Index = defineComponent({
   setup() {
-    const { fetchCartList, fetchUpdateCart, fetchRemoveCart, fetchSelectCart, fetchAllCart } =
-      useCartStore()
-    fetchCartList({})
+    const { fetchCartList, fetchUpdateCart, fetchDelCart, fetchSelectCart } = useCartStore()
+    fetchCartList()
     const { cartList, totalPrice, isSelect, selectedAll } = storeToRefs(useCartStore())
 
-    const handlerCheck = (id: number) => {
-      fetchSelectCart(id).then((res: any) => {
-        if (res.status === 1) fetchCartList({})
+    const handleRadio = (goodsId: number, skuId: number) => {
+      const copyCartList = JSON.parse(JSON.stringify(cartList.value))
+      console.log(copyCartList)
+      copyCartList.map((item: any) => {
+        if (item.goodsId === goodsId && item.skuId === skuId)
+          item.selected = item.selected === 0 ? 1 : 0
+      })
+      fetchSelectCart(copyCartList).then((res: any) => {
+        if (res.code === 1) fetchCartList()
       })
     }
 
-    const handlerCheckAll = () => {
-      fetchAllCart().then((res: any) => {
-        if (res.status === 1) fetchCartList({})
+    const handleSelectAll = () => {
+      const copyCartList = JSON.parse(JSON.stringify(cartList.value))
+      copyCartList.map((item: any) => {
+        item.selected = selectedAll.value ? 0 : 1
+      })
+      fetchSelectCart(copyCartList).then((res: any) => {
+        if (res.code === 1) fetchCartList()
       })
     }
 
-    const handleUpdateNum = ({ id, num, type = 0 }: { id: number; num: number; type: number }) => {
-      fetchUpdateCart(id, num, type).then((res: any) => {
-        if (res.status === 1) fetchCartList({})
+    interface paramsUpdateCart {
+      goodsId: number
+      skuId: number
+      num: number
+      type: string
+    }
+
+    const handleUpdateCart = ({ goodsId, skuId, num, type = 'replace' }: paramsUpdateCart) => {
+      const copyProducts = JSON.parse(JSON.stringify(cartList.value))
+      const product: any = copyProducts.find(
+        (item: any) => item.goodsId === goodsId && item.skuId === skuId,
+      )
+
+      if (!product) return
+      let count = product.count
+      switch (type) {
+        case 'reduce':
+          if (product.count === 1) return
+          count = parseInt(product.count) - 1
+          break
+        case 'add':
+          count = parseInt(product.count) + 1
+          break
+        default:
+          count = Number(num)
+      }
+      product.count = count
+      fetchUpdateCart(copyProducts).then((res: any) => {
+        if (res.code === 1) fetchCartList()
       })
     }
 
-    const handleRemove = (id: number) => {
-      fetchRemoveCart({ cart_ids: [id] }).then((res: any) => {
+    const handleDelCart = (goodsId: number, skuId: number) => {
+      fetchDelCart({ goodsId, skuId }).then((res: any) => {
         console.log(res)
-        if (res.status === 1) fetchCartList({})
+        if (res.code === 1) fetchCartList()
       })
     }
 
     return () => {
+      if (cartList.value.length == 0) return <div class=" py-5 text-center">购物车空空如也</div>
       return (
         <div class=" overflow-y-auto">
           <div class="mx-2 mt-2">
@@ -47,23 +82,39 @@ const Index = defineComponent({
                       type="checkbox"
                       checked={item.selected === 1}
                       class="h-5 w-5"
-                      onChange={() => handlerCheck(item.id)}
+                      onChange={() => handleRadio(item.goodsId, item.skuId)}
                     />
-                    <img src={goodImage} alt="" width={100} height={100} />
+                    <router-link to={`/goods/detail?id=${item.goods_id}`}>
+                      <img src={item.image} alt="" width={100} height={100} />
+                    </router-link>
                     <div class="flex flex-1 flex-col gap-2">
-                      <div class="line-clamp-2">{item.goods_name}</div>
+                      <div class="line-clamp-2">{item.goodsName}</div>
                       <div class="flex gap-4 text-base">
                         <span
                           onClick={() =>
-                            item.goods_num > 1
-                              ? handleUpdateNum({ id: item.id, num: 1, type: -1 })
+                            item.count > 1
+                              ? handleUpdateCart({
+                                  goodsId: item.goodsId,
+                                  skuId: item.skuId,
+                                  num: 1,
+                                  type: 'reduce',
+                                })
                               : ''
                           }
                         >
                           -
                         </span>
-                        <span>{item.goods_num}</span>
-                        <span onClick={() => handleUpdateNum({ id: item.id, num: 1, type: 1 })}>
+                        <span>{item.count}</span>
+                        <span
+                          onClick={() =>
+                            handleUpdateCart({
+                              goodsId: item.goodsId,
+                              skuId: item.skuId,
+                              num: 1,
+                              type: 'add',
+                            })
+                          }
+                        >
                           +
                         </span>
                       </div>
@@ -71,8 +122,8 @@ const Index = defineComponent({
                   </div>
 
                   <div class="flex flex-col items-center justify-around">
-                    <div class="text-red-700">￥{item.goods_price}</div>
-                    <div onClick={() => handleRemove(item.id)}>删除</div>
+                    <div class="text-red-700">￥{item.price}</div>
+                    <div onClick={() => handleDelCart(item.goodsId, item.skuId)}>删除</div>
                   </div>
                 </div>
               ))}
@@ -84,7 +135,7 @@ const Index = defineComponent({
                   type={'checkbox'}
                   class="h-6 w-6"
                   checked={selectedAll.value}
-                  onChange={() => handlerCheckAll()}
+                  onChange={() => handleSelectAll()}
                 />
                 全选
               </div>

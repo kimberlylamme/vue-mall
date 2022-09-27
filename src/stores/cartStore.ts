@@ -1,20 +1,24 @@
 import { defineStore } from 'pinia'
-import http from './http'
+import products from '../data/products.json'
+import type { Product } from '@/interfaces/goods'
+import type { Cart, cartProduct } from '@/interfaces/carts'
 
-type Params = {
-  session_key?: string
-  cart?: any
-  cart_ids?: any
-  goods_id?: number
-  goods_num?: number
-  item_id?: number
-}
-
-type cartState = {
+interface cartState {
   cartList: any[]
   isSelect: boolean
   selectedAll: boolean
   totalPrice: string
+}
+
+interface paramAddCart {
+  goodsId: number
+  count: number
+  skuId: number
+}
+
+interface paramDelcart {
+  goodsId: number
+  skuId: number
 }
 
 export const useCartStore = defineStore({
@@ -29,122 +33,119 @@ export const useCartStore = defineStore({
   getters: {},
   actions: {
     // 购物车列表
-    async fetchCartList(params: Params) {
+    async fetchCartList() {
       try {
-        const url = '/api/cart/index'
-        params['session_key'] = 'e8b91d9fd4195c6c772670750d90bd19'
-        const response = await http.post(url, params)
         this.$reset()
-        this.cartList = response.data.cartList
-        if (response.data.cartList.length === 0) return
+        const lists = JSON.parse(localStorage.getItem('cart-list') || '[]')
+        if (lists.length === 0) return
         let total = 0
         let checkAll = true
         let checkCal = false
-        const copyProducts = JSON.parse(JSON.stringify(this.cartList))
-        copyProducts.map((item: any) => {
-          if (item.selected === 0 && checkAll === true) checkAll = false
-          if (item.selected === 1 && checkCal === false) checkCal = true
-          if (item.selected === 1) {
-            total += item.goods_price * item.goods_num
+        lists.map((list: any) => {
+          list.goodsName = ''
+          list.image = ''
+          list.price = 0.0
+          if (list.selected === 0 && checkAll === true) checkAll = false
+          if (list.selected === 1 && checkCal === false) checkCal = true
+          const product = products.find((product) => list.goodsId === product.goodsId)
+          if (!product) return list
+          list.goodsName = product.goodsName
+          list.image = product.image
+          list.price = product.price
+          const sku = product.skus?.find((sku) => sku.skuId === list.skuId)
+          if (!sku) {
+            if (list.selected === 1) {
+              total += Number(product.price * list.count)
+            }
+            return list
           }
+          list.image = sku.image
+          list.price = sku.price
+          if (list.selected === 1) {
+            total += Number(sku.price * list.count)
+          }
+          return list
         })
-
         this.totalPrice = total.toFixed(2)
         this.selectedAll = checkAll
         this.isSelect = checkCal
-        return response.data.cartList
+        this.cartList = lists
       } catch (error) {
         console.log('fetchCartList', error)
       }
     },
 
     // 添加购物车
-    async fetchAddCart(params: Params) {
+    async fetchAddCart(params: paramAddCart) {
       try {
-        const url = '/api/cart/ajaxAddCart'
-        params['session_key'] = 'e8b91d9fd4195c6c772670750d90bd19'
-        const response = await http.get(url, { params })
-        return response
+        const cartLists = JSON.parse(localStorage.getItem('cart-list') || '[]')
+        const copyCartLists = JSON.parse(JSON.stringify(cartLists))
+        const product = products?.find((product: Product) => product.goodsId === params.goodsId)
+        if (!product) return { code: 0, message: '没有该商品' }
+        const sku = product.skus?.find((sku) => sku.skuId === params.skuId)
+
+        if (cartLists.length > 0) {
+          const cartInfo = copyCartLists.find(
+            (list: Cart) => list.goodsId === params.goodsId && list.skuId === params.skuId,
+          )
+          if (cartInfo) {
+            cartInfo.count = cartInfo.count + params.count
+            if (!sku && product.stock < cartInfo.count) return { code: 0, message: '库存不足' }
+            if (sku && sku.stock < cartInfo.count) return { code: 0, message: '库存不足' }
+            localStorage.setItem('cart-list', JSON.stringify(copyCartLists))
+            return { code: 1, message: '操作成功' }
+          }
+        }
+
+        if (!sku && product.stock < params.count) return { code: 0, message: '库存不足' }
+        if (sku && sku.stock < params.count) return { code: 0, message: '库存不足' }
+        const addCart = {
+          goodsId: params.goodsId,
+          skuId: params.skuId,
+          count: params.count,
+          selected: 0,
+        }
+        console.log(addCart)
+        localStorage.setItem('cart-list', JSON.stringify([...cartLists, addCart]))
+        return { code: 1, message: '操作成功' }
       } catch (error) {
         console.log('fetchAddCart', error)
       }
     },
 
     // 修改购物车
-    async fetchUpdateCart(id: number, num: number, type: number) {
+    async fetchUpdateCart(params: cartProduct[]) {
       try {
-        const product: any = this.cartList.find((item: any) => item.id === id)
-        console.log('product', product)
-        if (!product) return
-
-        let productNum = product.goods_num
-        switch (type) {
-          case -1:
-            if (product.goods_num === 1) return
-            productNum = parseInt(product.goods_num) - 1
-            break
-          case 1:
-            productNum = parseInt(product.goods_num) + 1
-            break
-          default:
-            productNum = product.goods_num
-        }
-
-        const url = '/api/cart/changeNum'
-        const params: Params = { cart: { id: id, goods_num: productNum } }
-        params['session_key'] = 'e8b91d9fd4195c6c772670750d90bd19'
-        const response = await http.post(url, params)
-        return response
+        if (params.length > 0) localStorage.setItem('cart-list', JSON.stringify(params))
+        return { code: 1, message: '操作成功' }
       } catch (error) {
         console.log('fetchUpdateCart', error)
       }
     },
 
     // 移除购物车
-    async fetchRemoveCart(params: Params) {
+    async fetchDelCart(params: paramDelcart) {
       try {
-        const url = '/api/cart/delete'
-        params['session_key'] = 'e8b91d9fd4195c6c772670750d90bd19'
-        const response = await http.post(url, params)
-        return response
+        const cartLists = JSON.parse(localStorage.getItem('cart-list') || '[]')
+        const lists = cartLists.filter(
+          (cart: Cart) => !(cart.goodsId === params.goodsId && cart.skuId === params.skuId),
+        )
+        lists.length > 0
+          ? localStorage.setItem('cart-list', JSON.stringify(lists))
+          : localStorage.setItem('cart-list', '')
+        return { code: 1, message: '删除成功' }
       } catch (error) {
-        console.log('fetchRemoveCart', error)
+        console.log('fetchDelCart', error)
       }
     },
 
     // 选择商品
-    async fetchSelectCart(id: number) {
+    async fetchSelectCart(params: cartProduct[]) {
       try {
-        const copyProducts = JSON.parse(JSON.stringify(this.cartList))
-        copyProducts.map((item: any) => {
-          if (item.id === id) item.selected = item.selected === 0 ? 1 : 0
-        })
-
-        const url = '/api/cart/AsyncUpdateCart'
-        const params: Params = { cart: copyProducts }
-        params['session_key'] = 'e8b91d9fd4195c6c772670750d90bd19'
-        const response = await http.post(url, params)
-        return response
+        if (params.length > 0) localStorage.setItem('cart-list', JSON.stringify(params))
+        return { code: 1, message: '操作成功' }
       } catch (error) {
         console.log('fetchSelectCart', error)
-      }
-    },
-
-    // 选择商品
-    async fetchAllCart() {
-      try {
-        const copyProducts = JSON.parse(JSON.stringify(this.cartList))
-        copyProducts.map((item: any) => {
-          item.selected = this.selectedAll ? 0 : 1
-        })
-
-        const url = '/api/cart/AsyncUpdateCart'
-        const params: Params = { cart: copyProducts }
-        params['session_key'] = 'e8b91d9fd4195c6c772670750d90bd19'
-        const response = await http.post(url, params)
-        return response
-      } catch (error) {
-        console.log('fetchAllCart', error)
       }
     },
   },

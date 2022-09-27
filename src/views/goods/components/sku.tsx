@@ -1,15 +1,16 @@
+import type { SkuTree } from '@/interfaces/goods'
 import { useGoodDetailStore } from '@/stores/goodDetailStore'
 import { storeToRefs } from 'pinia'
 import { defineComponent } from 'vue'
 
 const Sku = defineComponent({
   setup() {
-    const { toggleModal, isCheckSingle, addCart, toBuy } = useGoodDetailStore()
-    const { skuTree, skuSelect, sku, isModal, toGo } = storeToRefs(useGoodDetailStore())
+    const { toggleModal, chooseSku, addCart, toBuy } = useGoodDetailStore()
+    const { skuTrees, selectSku, matchSku, isModal, toGo } = storeToRefs(useGoodDetailStore())
 
     const handleSelectSku = (cid: number, did: number, able: boolean) => {
       if (!able) return
-      const flag = isCheckSingle(cid, did)
+      chooseSku(cid, did)
     }
 
     return () => {
@@ -19,37 +20,39 @@ const Sku = defineComponent({
           <div class="absolute bottom-0 z-30 h-2/3 w-full  overflow-y-auto rounded-t-xl bg-white ">
             <div class="w-full px-4">
               <div class="my-5 flex items-end gap-3">
-                <div class="h-20 w-20 bg-blue-500"></div>
+                <div class="h-20 w-20 bg-blue-500">
+                  {selectSku.value.image && <img src={selectSku.value.image} alt="" />}
+                </div>
                 <div>
                   <div class="text-red-600">
-                    ￥<span class="text-2xl">{skuSelect.value.price}</span>
+                    ￥<span class="text-2xl">{selectSku.value.price}</span>
                   </div>
-                  <div>{skuSelect.value.skuName ? `已选：${skuSelect.value.skuName}` : ''}</div>
+                  <div>{selectSku.value.skuName ? `已选：${selectSku.value.skuName}` : ''}</div>
                 </div>
               </div>
 
               <div class="w-full space-y-4">
-                {skuTree.value &&
-                  skuTree.value.map((item: any, key: number) => {
+                {skuTrees.value &&
+                  skuTrees.value.map((skuTree: SkuTree, key: number) => {
                     return (
                       <div key={key}>
-                        <div class="font-bold">{item.name}</div>
+                        <div class="font-bold">{skuTree.name}</div>
                         <div class="mt-2 flex flex-wrap gap-4">
-                          {item.value.map((item2: any, kk: number) => {
+                          {skuTree.childs.map((child: any, kk: number) => {
                             return (
                               <span
                                 key={kk}
                                 class={`rounded-2xl bg-gray-300 px-2 py-1 ${
-                                  item2.item_id === sku.value[item.id]
+                                  child.itemId === matchSku.value[skuTree.id]
                                     ? 'border border-blue-500 text-blue-500'
                                     : ''
-                                } ${item2.able ? '' : 'opacity-50'}`}
+                                } ${child.able ? '' : 'opacity-50'}`}
                                 onClick={() => {
-                                  handleSelectSku(item.id, item2.item_id, item2.able)
+                                  handleSelectSku(skuTree.id, child.itemId, child.able)
                                 }}
                               >
-                                {item2.name}
-                                {item2.able}
+                                {child.name}
+                                {child.able}
                               </span>
                             )
                           })}
@@ -63,9 +66,9 @@ const Sku = defineComponent({
                 <div class="font-bold">数量</div>
                 <div class="flex items-center gap-3 text-base font-bold">
                   <div
-                    class={`${skuSelect.value.count <= 1 ? 'text-gray-500' : ''}`}
+                    class={`${selectSku.value.count <= 1 ? 'text-gray-500' : ''}`}
                     onClick={() => {
-                      skuSelect.value.count > 1 ? skuSelect.value.count-- : ''
+                      selectSku.value.count > 1 ? selectSku.value.count-- : ''
                     }}
                   >
                     -
@@ -73,17 +76,17 @@ const Sku = defineComponent({
                   <input
                     class="w-8 text-center outline-none"
                     type="number"
-                    value={skuSelect.value.count}
+                    value={selectSku.value.count}
                     onChange={(e) => {
-                      skuSelect.value.count = Number((e.target as HTMLInputElement).value)
+                      selectSku.value.count = Number((e.target as HTMLInputElement).value)
                     }}
                   />
 
                   <div
                     onClick={() => {
-                      skuSelect.value.store_count > skuSelect.value.count
-                        ? skuSelect.value.count++
-                        : skuSelect.value.count
+                      selectSku.value.stock > selectSku.value.count
+                        ? selectSku.value.count++
+                        : selectSku.value.count
                     }}
                   >
                     +

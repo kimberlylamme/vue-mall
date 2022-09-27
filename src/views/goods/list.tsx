@@ -1,99 +1,82 @@
 import { ViewGrid, ViewList } from '../../components/svg'
-import type { Cards } from '../../interfaces/goods'
+import type { Product } from '../../interfaces/goods'
 import Card from '../../components/card'
 import Search from '../../components/search'
 import Toolbal from './components/toolbar'
-
-import { defineComponent, ref, watch } from 'vue'
-import { useGoodStore } from '../../stores/goodStore'
+import { defineComponent, reactive, ref } from 'vue'
+import { useProductStore } from '../../stores/productStore'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 
 const Lists = defineComponent({
   setup() {
     const route = useRoute()
-    let params = {}
-    // 搜索
-    const searchWord = ref('')
-    if (route.query.q) {
-      searchWord.value = route.query.q as string
-      params = { ...params, q: searchWord.value }
-    }
-    // 分类ID
-    const cid = ref('')
-    if (route.query.cid) {
-      cid.value = route.query.cid as string
-      params = { ...params, id: cid.value }
-    }
+    const q = route.query.q ? (route.query.q as string) : ''
+    const params = reactive({
+      page: 1,
+      sales: '',
+      price: '',
+      keyWord: q,
+    })
+    const isVertical = ref(false)
+    const keyWord = ref(q)
+    const sales = ref(false)
+    const price = ref('')
 
     // 加载数据
-    const page = ref(1)
-    const { fetchGoodList, setGoodList } = useGoodStore()
-    params = { ...params, page: page.value }
+    const { fetchGoodList, initGoodList } = useProductStore()
+    initGoodList()
     fetchGoodList(params)
-    const { goodsList, goodsListLoading } = storeToRefs(useGoodStore())
+    const { products, loading } = storeToRefs(useProductStore())
     const containRef = ref<HTMLDivElement | null>(null)
     const onScroll = () => {
-      if (!goodsListLoading) return
+      if (!loading.value) return
       if (!containRef.value) return
       const { scrollTop, scrollHeight, clientHeight } = containRef.value
       if (scrollTop + clientHeight !== scrollHeight) return
-      page.value += 1
+      params.page = params.page + 1
+      fetchGoodList(params)
     }
-
-    // 刷选
-    const sale = ref(false)
-    const price = ref('')
-
-    watch([page, searchWord, sale, price], () => {
-      console.log('watch')
-      let map = {}
-      let sort: any = []
-      let _sort = ''
-      map = { ...map, page: page.value }
-      if (searchWord.value) map = { ...map, q: searchWord.value }
-      if (cid.value) map = { ...map, id: cid.value }
-      if (sale.value) sort = [...sort, ['sales_sum desc']]
-      if (price.value) sort = [...sort, [`shop_price ${price.value}`]]
-      if (sort.length) {
-        _sort = sort.join(',')
-        map = { ...map, total_sort: _sort }
-      }
-      fetchGoodList(map)
-    })
-
-    const isVertical = ref(false)
 
     return () => {
       return (
         <div class="h-screen overflow-y-auto" onScroll={onScroll} ref={containRef}>
           <div class=" bg-blue-400 py-4 px-2">
             <Search
-              word={searchWord}
-              onSearch={(q: string) => {
-                ;(page.value = 1), setGoodList()
+              keyWord={keyWord}
+              onSearch={() => {
+                params.page = 1
+                params.keyWord = keyWord.value
+                initGoodList()
+                fetchGoodList(params)
               }}
             />
           </div>
-          <div class="rounded-t-lg bg-white">
+          <div class="mb-4 rounded-t-lg bg-white">
             <Toolbal
-              sale={sale}
-              onSale={(s: any) => {
-                page.value = 1
-                setGoodList()
+              sale={sales}
+              onSale={() => {
+                params.page = 1
+                params.sales = sales.value ? 'down' : ''
+                params.price = ''
+                initGoodList()
+                fetchGoodList(params)
               }}
               price={price}
-              onPrice={(p: any) => {
-                page.value = 1
-                setGoodList()
+              onPrice={() => {
+                params.page = 1
+                params.price = price.value
+                params.sales = ''
+                initGoodList()
+                fetchGoodList(params)
               }}
             />
           </div>
 
           <div class={`grid gap-4 ${isVertical.value ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            {goodsList.value &&
-              goodsList.value.map((card: Cards) => (
-                <Card key={card.goods_id} isVertical={isVertical.value} {...card}></Card>
+            {products.value &&
+              products.value.map((card: Product) => (
+                <Card key={card.goodsId} isVertical={isVertical.value} product={card}></Card>
               ))}
 
             <div class=" fixed bottom-10 right-5 space-y-4">
@@ -110,86 +93,5 @@ const Lists = defineComponent({
     }
   },
 })
-
-// const Lists = () => {
-//   const dispatch = useAppDispatch()
-//   const [isVertical, setIsVertical] = useState(false)
-//   const containRef = useRef<HTMLDivElement>(null)
-
-//   const router = useRouter()
-//   const q = router.query.q ? router.query.q : ''
-//   const cid = router.query.cid ? router.query.cid : ''
-//   const [word, setWord] = useState(q)
-//   const [sale, setSale] = useState(false)
-//   const [price, setPrice] = useState('')
-//   const [page, setPage] = useState(1)
-
-//   let params = {}
-//   let sort: any = []
-//   let _sort = ''
-//   params = { ...params, page: page }
-//   if (word) params = { ...params, q: word }
-//   if (cid) params = { ...params, id: cid }
-//   if (sale) sort = [...sort, ['sales_sum desc']]
-//   if (price) sort = [...sort, [`shop_price ${price}`]]
-//   if (sort.length) {
-//     _sort = sort.join(',')
-//     params = { ...params, total_sort: _sort }
-//   }
-
-//   const isload = useAppSelector((state) => state.goods.goodsListLoading)
-//   const goods: Cards[] = useAppSelector(goodsList)
-
-//   useEffect(() => {
-//     if (isload) {
-//       dispatch(fetchGoodList(params))
-//     }
-//   }, [word, sale, price, page])
-
-//   const onScroll = () => {
-//     if (isload === false) return
-//     if (!containRef.current) return
-//     const { scrollTop, scrollHeight, clientHeight } = containRef.current
-//     if (scrollTop + clientHeight !== scrollHeight) return
-//     setPage((page) => page + 1)
-//   }
-
-//   return (
-//     <div class="h-screen overflow-y-auto" onScroll={onScroll} ref={containRef}>
-//       <div class=" bg-blue-400 py-4 px-2">
-//         <Search
-//           keyWord={word}
-//           onSearch={(q: SetStateAction<string | string[]>) => {
-//             setWord(q), setPage(1), dispatch(isLoad())
-//           }}
-//         />
-//       </div>
-//       <div class="rounded-t-lg bg-white">
-//         <Toolbal
-//           onSale={(ckeckSale) => {
-//             setSale(ckeckSale), setPage(1), dispatch(isLoad())
-//           }}
-//           onPrice={(checkPrie) => {
-//             setPrice(checkPrie), setPage(1), dispatch(isLoad())
-//           }}
-//         />
-//       </div>
-
-//       <div class={`grid gap-4 ${isVertical ? 'grid-cols-2' : 'grid-cols-1'}`}>
-//         {goods &&
-//           goods.map((card) => <Card key={card.goods_id} isVertical={isVertical} {...card}></Card>)}
-
-//         <div class=" fixed bottom-10 right-5 space-y-4">
-//           <div
-//             class="flex h-8 w-8 items-center justify-center rounded-full border border-gray-400 bg-white p-1 text-gray-400"
-//             onClick={() => setIsVertical(!isVertical)}
-//           >
-//             {isVertical ? <ViewList /> : <ViewGrid />}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   )
-// }
 
 export default Lists

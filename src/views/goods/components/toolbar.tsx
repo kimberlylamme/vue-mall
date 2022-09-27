@@ -7,13 +7,13 @@ const Toolbal = ({
   price,
   onPrice = (f: any) => f,
 }: {
-  sale: Ref<Boolean>
-  onSale: Function
+  sale: Ref<boolean>
+  onSale: any
   price: Ref<string>
-  onPrice: Function
+  onPrice: any
 }) => {
   return (
-    <div class=" flex justify-around py-1">
+    <div class=" flex justify-around py-2">
       <div
         onClick={() => {
           sale.value = !sale.value
@@ -26,16 +26,16 @@ const Toolbal = ({
       <div
         class="flex flex-row"
         onClick={() => {
-          price.value = price.value === 'asc' ? 'desc' : 'asc'
+          price.value = price.value === 'up' ? 'down' : 'up'
           onPrice()
         }}
       >
         <div>价格</div>
         <div class="ml-1">
-          <span class={price.value === 'asc' ? 'text-red-900' : ''}>
+          <span class={price.value === 'up' ? 'text-red-900' : ''}>
             <ChevronUp />
           </span>
-          <span class={price.value === 'desc' ? 'text-red-900' : ''}>
+          <span class={price.value === 'down' ? 'text-red-900' : ''}>
             <ChevronDown />
           </span>
         </div>

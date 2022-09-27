@@ -1,13 +1,16 @@
 import Card from '@/components/card'
 import Search from '@/components/search'
-import type { Cards } from '@/interfaces/goods'
+import type { Product } from '@/interfaces/goods'
 import { defineComponent, ref, watch } from 'vue'
 import Carousel from './components/carousel'
-import GoodsColumn from './components/goodsColumn'
 import Nav from './components/nav'
 import { useRouter } from 'vue-router'
-import { useHomeStore } from '@/stores/homeStore'
+import { useProductStore } from '@/stores/productStore'
 import { storeToRefs } from 'pinia'
+import 'swiper/css'
+import 'swiper/css/pagination'
+import { Swiper, SwiperSlide } from 'swiper/vue'
+
 const Home = defineComponent({
   setup() {
     const router = useRouter()
@@ -21,13 +24,14 @@ const Home = defineComponent({
     }
 
     const page = ref(1)
-    const { fetchGoodLike } = useHomeStore()
-    fetchGoodLike({ page: page.value })
-    const { goodLike, goodLikeLoading } = storeToRefs(useHomeStore())
+    const { fetchGoodList, initGoodList } = useProductStore()
+    initGoodList()
+    fetchGoodList({ page: page.value })
+    const { products, loading } = storeToRefs(useProductStore())
 
     const goodsRef = ref<HTMLDivElement | null>(null)
     const onScroll = () => {
-      if (goodLikeLoading.value === false) return
+      if (!loading.value) return
       if (!goodsRef?.value) return
       const { scrollTop, scrollHeight, clientHeight } = goodsRef.value
       if (scrollTop + clientHeight !== scrollHeight) return
@@ -35,8 +39,7 @@ const Home = defineComponent({
     }
 
     watch(page, () => {
-      console.log('page', page.value)
-      fetchGoodLike({ page: page.value })
+      fetchGoodList({ page: page.value })
     })
 
     return () => {
@@ -44,7 +47,7 @@ const Home = defineComponent({
         <div class="mb-16 h-screen overflow-y-auto" onScroll={onScroll} ref={goodsRef}>
           {/* 搜索 */}
           <div class="bg-blue-400 py-4 px-2">
-            <Search word={searchWord} onSearch={() => onSearch()} />
+            <Search keyWord={searchWord} onSearch={() => onSearch()} />
           </div>
 
           {/* 轮播 */}
@@ -54,7 +57,23 @@ const Home = defineComponent({
           <Nav />
 
           {/* 秒杀 */}
-          <GoodsColumn />
+          <div class="my-2  px-2">
+            <div class=" relative h-32 w-full rounded-lg">
+              <img src="/active.jpg" alt="促销活动" />
+            </div>
+            <Swiper slidesPerView={2.5} spaceBetween={16} class="mySwiper bg-gray-100">
+              {products.value?.slice(0, 6).map((good: Product) => (
+                <SwiperSlide key={good.goodsId}>
+                  <Card isVertical={true} product={good}></Card>
+                </SwiperSlide>
+              ))}
+              <SwiperSlide class="!h-auto">
+                <router-link to={'/goods/list'}>
+                  <a class="flex h-full items-center justify-center bg-white py-4 px-3">查看更多</a>
+                </router-link>
+              </SwiperSlide>
+            </Swiper>
+          </div>
 
           {/* 猜你喜欢 */}
           <div>
@@ -68,9 +87,9 @@ const Home = defineComponent({
               <hr class="w-20 text-black" />
             </div>
             <div class="grid grid-cols-2 gap-4">
-              {goodLike.value &&
-                goodLike.value?.map((good: Cards) => (
-                  <Card key={good.goods_id} isVertical={true} {...good}></Card>
+              {products.value &&
+                products.value?.map((good: Product) => (
+                  <Card key={good.goodsId} isVertical={true} product={good}></Card>
                 ))}
             </div>
           </div>

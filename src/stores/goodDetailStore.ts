@@ -1,35 +1,15 @@
 import { defineStore } from 'pinia'
-import http from './http'
 import { useCartStore } from './cartStore'
+import type { Product, SelectSku, Sku, SkuTree } from '@/interfaces/goods'
+import products from '../data/products.json'
 
-type Params = {
-  session_key?: string
-  page?: number
-  id?: string | number
-}
-
-type Good = {
-  goods?: any
-  spec_goods?: string
-  spec_tree?: any
-}
-
-type IskuSelect = {
-  skuId: number
-  skuName: string
-  skuImg: string
-  price: number
-  store_count: number
-  count: number
-}
-
-export type goodState = {
-  goodsDetail: Good
+interface goodState {
+  productInfo: Product
   isModal: boolean
-  skuTree: any[]
-  skuSpecs: any[]
-  skuSelect: IskuSelect
-  sku: any[]
+  skuTrees: SkuTree[]
+  skus: Sku[]
+  selectSku: SelectSku
+  matchSku: any
   toGo: number
 }
 
@@ -37,53 +17,63 @@ export const useGoodDetailStore = defineStore({
   id: 'goodDetailStore',
   state: () =>
     ({
-      goodsDetail: {},
+      productInfo: {
+        goodsId: 0,
+        goodsName: '',
+        price: 0,
+        marketPrice: 0,
+        image: '',
+        images: [],
+        sales: 0,
+        stock: 0,
+        skuTrees: [],
+        skus: [],
+      },
       isModal: false,
-      skuTree: [],
-      skuSpecs: [],
-      skuSelect: { skuId: 0, skuName: '', skuImg: '', price: 0, store_count: 0, count: 1 },
-      sku: [],
+      skuTrees: [],
+      skus: [],
+      selectSku: { skuId: 0, skuName: '', image: '', price: 0, stock: 0, count: 1 },
+      matchSku: {},
       toGo: 0,
     } as goodState),
   getters: {},
   actions: {
     // 商品列表
-    async fetchGoodDetail(params: Params) {
+    async fetchGoodDetail(params: { goodsId: number }) {
       try {
-        const url = '/api/goods/goods_info'
-        params['session_key'] = 'e8b91d9fd4195c6c772670750d90bd19'
-        const response = await http.get(url, { params })
+        const productInfo = products.find((product) => product.goodsId === params.goodsId)
+        if (!productInfo) return
         // 重置值
         this.$reset()
-        this.goodsDetail = response.data
-        this.skuTree = response.data.spec_tree
-        this.skuSelect = { ...this.skuSelect, count: 1 }
-        this.skuSpecs = response.data.spec_goods ? JSON.parse(response.data.spec_goods) : []
-        if (this.skuSpecs.length == 0) {
-          this.skuSelect = {
-            ...this.skuSelect,
-            price: response.data.goods.shop_price,
-            store_count: response.data.goods.store_count,
+        this.skuTrees = productInfo.skuTrees
+        this.skus = productInfo.skus
+        if (this.skus.length == 0) {
+          this.selectSku = {
+            image: productInfo.image,
+            price: productInfo.price,
+            stock: productInfo.stock,
+            count: 1,
+            skuName: '',
+            skuId: 0,
           }
         }
         // 规格默认选择第一个
-        if (this.sku.length == 0 && this.skuSpecs.length > 0) {
-          this.skuSpecs.some((item) => {
-            if (item.store_count > 0) {
-              this.sku = item.specs
-              this.skuSelect = {
-                ...this.skuSelect,
-                price: item.price,
-                store_count: item.store_count,
-                skuName: item.key_name,
-                skuId: item.item_id,
-              }
-              this.skuIsAble()
-              return true
-            }
-          })
+        const matchSkuKey = Object.keys(JSON.parse(JSON.stringify(this.matchSku)))
+        if (matchSkuKey.length == 0 && this.skus.length > 0) {
+          const skuInfo = this.skus.find((item) => item.stock > 0)
+          if (!skuInfo) return
+          this.matchSku = skuInfo.key
+          this.selectSku = {
+            price: skuInfo.price,
+            stock: skuInfo.stock,
+            skuName: skuInfo.name,
+            skuId: skuInfo.skuId,
+            image: skuInfo.image,
+            count: 1,
+          }
+          this.skuIsAble()
         }
-        return response.data
+        this.productInfo = productInfo
       } catch (error) {
         console.log('fetchGoodDetail', error)
       }
@@ -98,55 +88,55 @@ export const useGoodDetailStore = defineStore({
     },
     // 商品规格是否可选
     skuIsAble() {
-      if (this.skuTree.length == 0) return
-      const newTree = JSON.parse(JSON.stringify(this.skuTree))
-      newTree.map((item: any) => {
-        item.value.map((item2: any) => {
-          item2.able = this.isAble(item.id, item2.item_id)
+      if (this.skuTrees.length == 0) return
+      const copySkuTrees = JSON.parse(JSON.stringify(this.skuTrees))
+      copySkuTrees.map((skuTree: SkuTree) => {
+        skuTree.childs.map((child: any) => {
+          child.able = this.isAble(skuTree.id, child.itemId)
         })
       })
-      this.skuTree = newTree
-      this.isCheckAll()
+      this.skuTrees = copySkuTrees
+      this.checkStock()
     },
 
-    isAble(key: string, value: number) {
-      const copySku = JSON.parse(JSON.stringify(this.sku))
-      copySku[key] = value
-      const seletSku = Object.values(copySku)
-      const flag = this.skuSpecs.some((item) => {
-        if (item.store_count <= 0) return false
-        const specs = Object.values(item.specs)
-        const someSpecs = specs.filter((item2) => {
-          return seletSku.includes(item2) === true
-        })
-        return someSpecs.length === seletSku.length ? true : false
+    isAble(key: number, value: number) {
+      const copyMatchSku = JSON.parse(JSON.stringify(this.matchSku))
+      copyMatchSku[key] = value
+      const matchSkuValues = Object.values(copyMatchSku)
+      const flag = this.skus.some((sku: Sku) => {
+        if (sku.stock <= 0) return false
+        const skuChildValues = Object.values(sku.key)
+        const someSpecs = skuChildValues.filter(
+          (spec: any) => matchSkuValues.includes(spec) === true,
+        )
+        return someSpecs.length === matchSkuValues.length ? true : false
       })
       return flag
     },
 
     // 判断规格是否选择完毕
-    isCheckAll() {
-      const countTree = this.skuTree.length
-      const skuValue = Object.values(JSON.parse(JSON.stringify(this.sku)))
+    checkStock() {
+      const countTree = this.skuTrees.length
+      const skuValue = Object.values(JSON.parse(JSON.stringify(this.matchSku)))
       const countSku = skuValue.length
       if (countTree != countSku) {
-        this.skuSelect = { ...this.skuSelect, skuName: '', skuId: 0 }
+        this.selectSku = { ...this.selectSku, skuName: '', skuId: 0 }
         return false
       }
-      this.skuSpecs.some((item: any) => {
-        const specs = Object.values(JSON.parse(JSON.stringify(item.specs)))
-        const res = specs.every((item2: any) => skuValue.includes(item2))
+      this.skus.some((sku: Sku) => {
+        const specs = Object.values(JSON.parse(JSON.stringify(sku.key)))
+        const res = specs.every((skuChild: any) => skuValue.includes(skuChild))
         if (res) {
           let newSelectSku: any = {
-            price: item.price,
-            store_count: item.store_count,
-            skuName: item.key_name,
-            skuId: item.item_id,
+            price: sku.price,
+            stock: sku.stock,
+            skuName: sku.name,
+            skuId: sku.skuId,
+            image: sku.image,
           }
-          if (this.skuSelect.count > item.store_count)
-            newSelectSku = { ...newSelectSku, count: item.store_count }
-          this.skuSelect = {
-            ...this.skuSelect,
+          if (this.selectSku.count > sku.stock) newSelectSku = { ...newSelectSku, count: sku.stock }
+          this.selectSku = {
+            ...this.selectSku,
             ...newSelectSku,
           }
           return true
@@ -156,52 +146,54 @@ export const useGoodDetailStore = defineStore({
     },
 
     // 单选
-    isCheckSingle(cid: number, did: number) {
-      const newSku = JSON.parse(JSON.stringify(this.sku))
-      const skuKey = Object.keys(newSku)
-      if (skuKey.length > 0) {
-        if (skuKey.includes(cid.toString())) {
-          const skuValue = newSku[cid]
-          skuValue === did ? delete newSku[cid] : (newSku[cid] = did)
-        } else {
-          newSku[cid] = did
-        }
-      } else {
-        newSku[cid] = did
+    chooseSku(id: number, itemId: number) {
+      const copyMatchSku = JSON.parse(JSON.stringify(this.matchSku))
+      const skuKey = Object.keys(copyMatchSku)
+      if (skuKey.length === 0) {
+        copyMatchSku[id] = itemId
+        this.matchSku = copyMatchSku
+        return
       }
-      this.sku = newSku
+      if (skuKey.includes(id.toString()) === false) {
+        copyMatchSku[id] = itemId
+        this.matchSku = copyMatchSku
+        return
+      }
+      copyMatchSku[id] === itemId ? delete copyMatchSku[id] : (copyMatchSku[id] = itemId)
+      this.matchSku = copyMatchSku
       this.skuIsAble()
       return true
     },
     // 添加到购物车
     addCart() {
-      const countTree = this.skuTree.length
-      const skuValue = Object.values(JSON.parse(JSON.stringify(this.sku)))
+      console.log('加入购物车')
+      const countTree = this.skuTrees.length
+      const skuValue = Object.values(JSON.parse(JSON.stringify(this.matchSku)))
       const countSku = skuValue.length
       if (countTree != countSku) {
         console.log('请选择商品规格')
         return
       }
-      if (this.skuSelect.count <= 0) {
+      if (this.selectSku.count <= 0) {
         console.log('请选择商品数量')
         return
       }
-      if (this.skuSelect.count > this.skuSelect.store_count) {
+      if (this.selectSku.count > this.selectSku.stock) {
         console.log('超出库存')
         return
       }
 
-      const res = this.isCheckAll()
+      const res = this.checkStock()
       if (!res) {
         console.log('请选择商品规格')
         return
       }
-      console.log('购物车', this.skuSelect)
+      console.log('购物车', this.selectSku)
       const { fetchAddCart } = useCartStore()
       fetchAddCart({
-        goods_id: this.goodsDetail.goods.goods_id,
-        goods_num: this.skuSelect.count,
-        item_id: this.skuSelect.skuId,
+        goodsId: this.productInfo.goodsId,
+        count: this.selectSku.count,
+        skuId: this.selectSku.skuId,
       }).then((res) => {
         console.log('添加购物车', res)
         return res
@@ -209,12 +201,12 @@ export const useGoodDetailStore = defineStore({
     },
     // 去购买
     toBuy() {
-      const res = this.isCheckAll()
+      const res = this.checkStock()
       if (!res) {
         console.log('请选择商品规格')
         return
       }
-      console.log('去购买', this.skuSelect)
+      console.log('去购买', this.selectSku)
     },
   },
 })

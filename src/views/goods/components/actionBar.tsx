@@ -14,12 +14,6 @@ const ActionBar = defineComponent({
                 <div>首页</div>
               </div>
             </router-link>
-            <router-link to={'/'}>
-              <div class="flex flex-col items-center gap-1">
-                <div class="h-5 w-5 bg-blue-500"></div>
-                <div>客服</div>
-              </div>
-            </router-link>
             <router-link to={'/cart'}>
               <div class="flex flex-col items-center gap-1">
                 <div class="h-5 w-5 bg-blue-500"></div>

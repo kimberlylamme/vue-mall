@@ -2,15 +2,16 @@ import 'swiper/css'
 import 'swiper/css/pagination'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Autoplay, Pagination } from 'swiper'
-import { defineComponent, onBeforeMount } from 'vue'
-import { useHomeStore } from '../../../stores/homeStore'
+import { defineComponent } from 'vue'
+import { useBannerStore } from '../../../stores/bannerStore'
 import { storeToRefs } from 'pinia'
+import type { Banner } from '@/interfaces/banner'
 
 const Carousel = defineComponent({
   setup() {
-    const { fetchAd } = useHomeStore()
-    fetchAd({})
-    const { adList } = storeToRefs(useHomeStore())
+    const { fetchAd } = useBannerStore()
+    fetchAd()
+    const { adList } = storeToRefs(useBannerStore())
 
     return () => {
       return (
@@ -24,11 +25,11 @@ const Carousel = defineComponent({
               autoplay={{ delay: 3000 }}
               pagination={{ clickable: true }}
             >
-              {adList.value.map((item: any) => {
+              {adList.value.map((item: Banner) => {
                 return (
                   <SwiperSlide key={item.id}>
-                    <div class="relative w-full bg-blue-500">
-                      <img src={item.images} alt={item.title} />
+                    <div class="w-full h-40">
+                      <img src={item.image} alt={item.title} class="h-full" />
                     </div>
                   </SwiperSlide>
                 )

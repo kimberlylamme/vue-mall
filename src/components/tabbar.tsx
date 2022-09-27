@@ -1,8 +1,8 @@
 import { useRoute } from 'vue-router'
-import { Home, Menu, ShoppingCart, User } from './svg'
+import { Home, ShoppingCart, User } from './svg'
 const Tabbar = () => {
   const router = useRoute()
-  const tabbarData = ['/', '/menu', '/my']
+  const tabbarData = ['/', '/my']
   const isShowTabbar = tabbarData.includes(router.path)
   return (
     <div
@@ -17,17 +17,6 @@ const Tabbar = () => {
         >
           <Home />
           <div>首页</div>
-        </a>
-      </router-link>
-
-      <router-link to="/menu">
-        <a
-          class={`flex flex-col items-center justify-center gap-1 px-4 py-1 ${
-            router.path === '/menu' ? 'text-blue-500' : ''
-          }`}
-        >
-          <Menu />
-          <div>分类</div>
         </a>
       </router-link>
 

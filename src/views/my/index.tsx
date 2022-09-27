@@ -77,10 +77,6 @@ const Index = defineComponent({
                   <div class="h-10 w-10 bg-blue-500"></div>
                   <div class=" text-gray-700">积分商城</div>
                 </div>
-                <div class="flex flex-col items-center gap-3 p-2">
-                  <div class="h-10 w-10 bg-blue-500"></div>
-                  <div class=" text-gray-700">客服中心</div>
-                </div>
               </div>
             </section>
           </div>
