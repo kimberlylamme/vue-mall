@@ -29,7 +29,7 @@ const Carousel = defineComponent({
                 return (
                   <SwiperSlide key={item.id}>
                     <div class="w-full h-40">
-                      <img src={item.image} alt={item.title} class="h-full" />
+                      <img src={item.image} alt={item.title} class="h-full w-full" />
                     </div>
                   </SwiperSlide>
                 )
