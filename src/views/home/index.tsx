@@ -59,7 +59,7 @@ const Home = defineComponent({
           {/* 秒杀 */}
           <div class="my-2  px-2">
             <div class=" relative h-32 w-full rounded-lg">
-              <img src="/active.jpg" alt="促销活动" />
+              <img src="/active.jpg" alt="促销活动" class="w-full" />
             </div>
             <Swiper slidesPerView={2.5} spaceBetween={16} class="mySwiper bg-gray-100">
               {products.value?.slice(0, 6).map((good: Product) => (

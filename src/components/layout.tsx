@@ -6,10 +6,10 @@ export const Layout = defineComponent({
     const child = slots.default?.()
     return () => {
       return (
-        <div class="min-h-screen w-full bg-gray-100">
-          <main>{child}</main>
+        <main class="min-h-screen w-full bg-gray-100">
+          {child}
           <Tabbar />
-        </div>
+        </main>
       )
     }
   },
